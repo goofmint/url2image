@@ -15,12 +15,19 @@ RUN apk add --no-cache \
     ttf-freefont \
     font-noto \
     font-noto-cjk \
+    musl-locales \
     && rm -rf /var/cache/apk/*
+
+# 日本語ロケールを生成
+RUN locale-gen ja_JP.UTF-8
 
 # 環境変数を設定
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-    NODE_ENV=production
+    NODE_ENV=production \
+    LANG=ja_JP.UTF-8 \
+    LC_ALL=ja_JP.UTF-8 \
+    LC_LANG=ja_JP.UTF-8
 
 # package.jsonとpackage-lock.jsonをコピー
 COPY package*.json ./

@@ -20,7 +20,7 @@ const limiter = rateLimit({
     error: 'リクエストが多すぎます。しばらく時間をおいてから再試行してください。'
   }
 });
-app.use('/api/screenshot', limiter);
+app.use('/', limiter);
 
 // ヘルスチェックエンドポイント
 app.get('/health', (req, res) => {
@@ -28,7 +28,7 @@ app.get('/health', (req, res) => {
 });
 
 // スクリーンショット生成エンドポイント
-app.get('/api/screenshot', async (req, res) => {
+app.get('/', async (req, res) => {
   try {
     const { url, width = 800, height = 600, format = 'jpeg' } = req.query;
 
@@ -69,7 +69,8 @@ app.get('/api/screenshot', async (req, res) => {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--lang=ja,en'
+        '--lang=ja,ja-JP,en',
+        '--accept-lang=ja,ja-JP;q=0.9,en;q=0.8'
       ]
     });
 
@@ -82,18 +83,37 @@ app.get('/api/screenshot', async (req, res) => {
       deviceScaleFactor: 1
     });
 
-    // 日本語フォントの設定
+    // 日本語フォントとロケールの設定
     await page.evaluateOnNewDocument(() => {
       const style = document.createElement('style');
       style.textContent = `
         body, * {
           font-family: 'Noto Sans CJK JP', 'Noto Sans JP', 'Noto Sans', 'TakaoPGothic', 'IPAPGothic', 'VL PGothic', 'Meiryo', 'sans-serif' !important;
         }
+        html {
+          lang: 'ja' !important;
+        }
       `;
       document.head.appendChild(style);
+
+      // 言語設定を強制的に日本語に
       Object.defineProperty(navigator, 'languages', {
-        get: () => ['ja', 'en']
+        get: () => ['ja', 'ja-JP', 'en']
       });
+
+      Object.defineProperty(navigator, 'language', {
+        get: () => 'ja'
+      });
+
+      // Accept-Languageヘッダーを設定
+      Object.defineProperty(navigator, 'userAgent', {
+        get: () => navigator.userAgent + ' Accept-Language: ja,ja-JP;q=0.9,en;q=0.8'
+      });
+    });
+
+    // Accept-Languageヘッダーを設定
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'ja,ja-JP;q=0.9,en;q=0.8'
     });
 
     // ページにアクセス
@@ -154,7 +174,7 @@ app.use((req, res) => {
 // サーバー起動
 app.listen(PORT, () => {
   console.log(`🚀 サーバーが起動しました: http://localhost:${PORT}`);
-  console.log(`📸 スクリーンショットAPI: http://localhost:${PORT}/api/screenshot`);
+  console.log(`📸 スクリーンショットAPI: http://localhost:${PORT}`);
   console.log(`💚 ヘルスチェック: http://localhost:${PORT}/health`);
 });
 
