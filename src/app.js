@@ -3,9 +3,49 @@ const puppeteer = require('puppeteer');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const fs = require('fs').promises;
+const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const CACHE_DIR = path.join(__dirname, '..', 'cache');
+
+// キャッシュファイル名を生成（URL + パラメータ + 日付）
+const generateCacheFileName = (url, width, height, format) => {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const params = `${width}x${height}.${format}`;
+  const hash = crypto.createHash('md5').update(url + params).digest('hex');
+  return `${today}_${hash}.${format}`;
+};
+
+// キャッシュファイルの存在確認
+const checkCacheExists = async (fileName) => {
+  try {
+    const filePath = path.join(CACHE_DIR, fileName);
+    await fs.access(filePath);
+    return filePath;
+  } catch {
+    return null;
+  }
+};
+
+// 古いキャッシュファイルを削除
+const cleanupOldCache = async () => {
+  try {
+    const files = await fs.readdir(CACHE_DIR);
+    const today = new Date().toISOString().split('T')[0];
+    
+    for (const file of files) {
+      const fileDate = file.split('_')[0];
+      if (fileDate !== today) {
+        await fs.unlink(path.join(CACHE_DIR, file));
+      }
+    }
+  } catch (error) {
+    console.error('キャッシュクリーンアップエラー:', error);
+  }
+};
 
 // セキュリティミドルウェア
 app.use(helmet());
@@ -58,6 +98,24 @@ app.get('/', async (req, res) => {
     // フォーマットの検証
     const validFormats = ['jpeg', 'png', 'webp'];
     const validFormat = validFormats.includes(format.toLowerCase()) ? format.toLowerCase() : 'jpeg';
+
+    // キャッシュファイル名を生成
+    const cacheFileName = generateCacheFileName(targetUrl.href, validWidth, validHeight, validFormat);
+    
+    // キャッシュファイルの存在確認
+    const cachedFilePath = await checkCacheExists(cacheFileName);
+    
+    if (cachedFilePath) {
+      console.log(`キャッシュからファイルを返却: ${cacheFileName}`);
+      
+      // キャッシュファイルを返却
+      const cachedImage = await fs.readFile(cachedFilePath);
+      res.setHeader('Content-Type', `image/${validFormat}`);
+      res.setHeader('Content-Disposition', `inline; filename="screenshot.${validFormat}"`);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // 24時間キャッシュ
+      res.setHeader('X-Cache', 'HIT');
+      return res.send(cachedImage);
+    }
 
     console.log(`スクリーンショット生成開始: ${targetUrl.href}, サイズ: ${validWidth}x${validHeight}, フォーマット: ${validFormat}`);
 
@@ -134,10 +192,17 @@ app.get('/', async (req, res) => {
 
     await browser.close();
 
+    // キャッシュファイルに保存
+    const cacheFilePath = path.join(CACHE_DIR, cacheFileName);
+    await fs.writeFile(cacheFilePath, screenshot);
+    
+    console.log(`スクリーンショットをキャッシュに保存: ${cacheFileName}`);
+
     // レスポンスヘッダーを設定
     res.setHeader('Content-Type', `image/${validFormat}`);
     res.setHeader('Content-Disposition', `inline; filename="screenshot.${validFormat}"`);
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // 1時間キャッシュ
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // 24時間キャッシュ
+    res.setHeader('X-Cache', 'MISS');
 
     // 画像を返却
     res.send(screenshot);
@@ -172,10 +237,14 @@ app.use((req, res) => {
 });
 
 // サーバー起動
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 サーバーが起動しました: http://localhost:${PORT}`);
   console.log(`📸 スクリーンショットAPI: http://localhost:${PORT}`);
   console.log(`💚 ヘルスチェック: http://localhost:${PORT}/health`);
+  
+  // 起動時に古いキャッシュファイルを削除
+  await cleanupOldCache();
+  console.log(`🗑️  古いキャッシュファイルを削除しました`);
 });
 
 module.exports = app; 
