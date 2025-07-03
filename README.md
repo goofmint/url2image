@@ -45,7 +45,7 @@ docker run -p 3000:3000 urltoogp
 
 ### スクリーンショット生成
 
-**エンドポイント:** `GET /api/screenshot`
+**エンドポイント:** `GET /`
 
 **パラメータ:**
 
@@ -60,10 +60,10 @@ docker run -p 3000:3000 urltoogp
 
 ```bash
 # 基本的な使用
-curl "http://localhost:3000/api/screenshot?url=https://example.com"
+curl "http://localhost:3000/?url=https://example.com"
 
 # カスタムサイズとフォーマット
-curl "http://localhost:3000/api/screenshot?url=https://example.com&width=1200&height=800&format=png"
+curl "http://localhost:3000/?url=https://example.com&width=1200&height=800&format=png"
 ```
 
 **レスポンス:**

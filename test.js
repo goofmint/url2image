@@ -36,7 +36,7 @@ function testHealthCheck() {
 // スクリーンショットAPIテスト
 function testScreenshot() {
   return new Promise((resolve, reject) => {
-    const url = `${baseUrl}/api/screenshot?url=${encodeURIComponent(testUrl)}&width=800&height=600&format=jpeg`;
+    const url = `${baseUrl}/?url=${encodeURIComponent(testUrl)}&width=800&height=600&format=jpeg`;
 
     const req = http.get(url, (res) => {
       if (res.statusCode === 200) {
@@ -70,7 +70,7 @@ function testScreenshot() {
 // エラーハンドリングテスト
 function testErrorHandling() {
   return new Promise((resolve, reject) => {
-    const url = `${baseUrl}/api/screenshot`; // URLパラメータなし
+    const url = `${baseUrl}/`; // URLパラメータなし
 
     const req = http.get(url, (res) => {
       let data = '';
