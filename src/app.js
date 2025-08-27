@@ -52,6 +52,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
+let browser;
 // レート制限の設定
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分
@@ -71,7 +72,7 @@ app.get('/health', (req, res) => {
 app.get('/', async (req, res) => {
   try {
     const { url, width = 800, height = 600, format = 'jpeg' } = req.query;
-
+    const context = await browser.createIncognitoBrowserContext();
     // URLパラメータの検証
     if (!url) {
       return res.status(400).json({
@@ -118,20 +119,21 @@ app.get('/', async (req, res) => {
     }
 
     console.log(`スクリーンショット生成開始: ${targetUrl.href}, サイズ: ${validWidth}x${validHeight}, フォーマット: ${validFormat}`);
-
-    // Puppeteerでブラウザを起動
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--lang=ja,ja-JP,en',
-        '--accept-lang=ja,ja-JP;q=0.9,en;q=0.8'
-      ]
-    });
-
+    
+    if (!browser || !browser.connected) {
+      // Puppeteerでブラウザを起動
+      browser = await puppeteer.launch({
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--lang=ja,ja-JP,en',
+          '--accept-lang=ja,ja-JP;q=0.9,en;q=0.8'
+        ]
+      });
+    }
     const page = await browser.newPage();
 
     // ビューポートを設定
@@ -190,7 +192,9 @@ app.get('/', async (req, res) => {
       fullPage: false
     });
 
-    await browser.close();
+    // await browser.close();
+    await page.close().catch(()=>{});
+    await context.close().catch(()=>{});
 
     // キャッシュファイルに保存
     const cacheFilePath = path.join(CACHE_DIR, cacheFileName);
@@ -208,6 +212,8 @@ app.get('/', async (req, res) => {
     res.send(screenshot);
 
     console.log(`スクリーンショット生成完了: ${targetUrl.href}`);
+
+    // puppeteerのキャッシュをクリア
 
   } catch (error) {
     console.error('スクリーンショット生成エラー:', error);
