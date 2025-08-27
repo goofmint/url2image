@@ -72,7 +72,6 @@ app.get('/health', (req, res) => {
 app.get('/', async (req, res) => {
   try {
     const { url, width = 800, height = 600, format = 'jpeg' } = req.query;
-    const context = await browser.createIncognitoBrowserContext();
     // URLパラメータの検証
     if (!url) {
       return res.status(400).json({
@@ -134,6 +133,7 @@ app.get('/', async (req, res) => {
         ]
       });
     }
+    const context = await browser.createIncognitoBrowserContext();
     const page = await browser.newPage();
 
     // ビューポートを設定
@@ -192,9 +192,6 @@ app.get('/', async (req, res) => {
       fullPage: false
     });
 
-    // await browser.close();
-    await page.close().catch(()=>{});
-    await context.close().catch(()=>{});
 
     // キャッシュファイルに保存
     const cacheFilePath = path.join(CACHE_DIR, cacheFileName);
@@ -214,7 +211,8 @@ app.get('/', async (req, res) => {
     console.log(`スクリーンショット生成完了: ${targetUrl.href}`);
 
     // puppeteerのキャッシュをクリア
-
+    await page.close();
+    await context.close();
   } catch (error) {
     console.error('スクリーンショット生成エラー:', error);
 
